@@ -16,6 +16,7 @@ import com.jiangdg.mediacodecdemo.utils.SensorAccelerometer;
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback{
     private Button mBtnRecord;
+    private Button mBtnSwitchCam;
     private SurfaceView mSurfaceView;
     private CameraUtils mCamManager;
     private boolean isRecording;
@@ -61,7 +62,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback{
             public void onClick(View view) {
                 MediaMuxerUtils mMuxerUtils = MediaMuxerUtils.getMuxerRunnableInstance();
                 if(!isRecording){
-                    mMuxerUtils.startMuxerThread();
+                    mMuxerUtils.startMuxerThread(mCamManager.getCameraDirection());
                     mBtnRecord.setText("停止录像");
                 }else{
                     mMuxerUtils.stopMuxerThread();
@@ -70,6 +71,22 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback{
                 isRecording = !isRecording;
             }
         });
+        
+        mBtnSwitchCam = (Button)findViewById(R.id.main_switch_camera_btn);
+        mBtnSwitchCam.setOnClickListener(new OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				if(isRecording){
+					Toast.makeText(MainActivity.this, "正在录像，无法切换",
+							Toast.LENGTH_SHORT).show();
+					return;
+				}
+				if(mCamManager != null){
+					mCamManager.switchCamera();
+				}
+			}
+		});
     }
 
     @Override

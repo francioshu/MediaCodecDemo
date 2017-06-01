@@ -6,6 +6,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Vector;
 
 import android.annotation.SuppressLint;
@@ -19,7 +21,7 @@ import android.util.Log;
 
 import com.jiangdg.mediacodecdemo.utils.CameraUtils;
 import com.jiangdg.mediacodecdemo.utils.MediaMuxerUtils;
-import com.teligen.yuvosd.YuvUtils;
+import com.jiangdg.yuvosd.YuvUtils;
 
 /** 对YUV视频流进行编码
  * Created by jiangdongguo on 2017/5/6.
@@ -37,7 +39,7 @@ public class EncoderVideoRunnable implements Runnable {
     // 码率
     private static final int BIT_RATE = CameraUtils.PREVIEW_WIDTH * CameraUtils.PREVIEW_HEIGHT *3*8*FRAME_RATE/256;
     // 正常垂直方向拍摄
-    private boolean isPhoneVertical;
+    private boolean isPhoneHorizontal = false;
     
     // MP4混合器
     private WeakReference<MediaMuxerUtils> muxerRunnableRf;
@@ -46,6 +48,7 @@ public class EncoderVideoRunnable implements Runnable {
     private int mColorFormat;
     private boolean isExit = false;
     private boolean isEncoderStart = false;
+    private boolean isAddTimeOsd = true;
     
     private Vector<byte[]> frameBytes;
     private byte[] mFrameData;
@@ -71,12 +74,14 @@ public class EncoderVideoRunnable implements Runnable {
                 return;
             }
             mColorFormat = selectSupportColorFormat(mCodecInfo,MIME_TYPE);
+            // NV21->I420
+//            mColorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar;
             mVideoEncodec = MediaCodec.createByCodecName(mCodecInfo.getName());
         }catch(IOException e){
             Log.e(TAG,"创建编码器失败"+e.getMessage());
             e.printStackTrace();
         }
-        if(!isPhoneVertical){
+        if(!isPhoneHorizontal){
         	mFormat = MediaFormat.createVideoFormat(MIME_TYPE, CameraUtils.PREVIEW_HEIGHT ,CameraUtils.PREVIEW_WIDTH);
         }else{
         	mFormat = MediaFormat.createVideoFormat(MIME_TYPE, CameraUtils.PREVIEW_WIDTH ,CameraUtils.PREVIEW_HEIGHT);
@@ -159,12 +164,26 @@ public class EncoderVideoRunnable implements Runnable {
         int mWidth = CameraUtils.PREVIEW_WIDTH;
         int mHeight = CameraUtils.PREVIEW_HEIGHT;
 		byte[] rotateNv21 = new byte[mWidth*mHeight*3/2];
-		if(isFrontCamera){
-			YuvUtils.Yuv420spRotate270ForFront(rawFrame, rotateNv21, mWidth, mHeight);
+		if(isFrontCamera()){
+			// 前置旋转270度(即竖屏采集，此时isPhoneHorizontal=false)
+			YuvUtils.Yuv420spRotateOfFront(rawFrame, rotateNv21, mWidth, mHeight, 270);
 		}else{
-			YuvUtils.Yuv420spRotate90ForBack(rawFrame, rotateNv21, mWidth, mHeight);
+			// 后置旋转90度(即竖直采集，此时isPhoneHorizontal=false)
+			YuvUtils.YUV420spRotateOfBack(rawFrame, rotateNv21, mWidth, mHeight, 90);
+			// 后置旋转270度(即倒立采集，此时isPhoneHorizontal=false)
+//			YuvUtils.YUV420spRotateOfBack(rawFrame, rotateNv21, mWidth, mHeight, 270);
+			// 后置旋转180度(即反向横屏采集，此时isPhoneHorizontal=true)		
+//			YuvUtils.YUV420spRotateOfBack(rawFrame, rotateNv21, mWidth, mHeight, 180);
+			// 如果是正向横屏，则无需旋转YUV，此时isPhoneHorizontal=true
 		}
-    	YuvUtils.setCorrectColorFormat(rotateNv21,mWidth,mHeight, mFrameData,mColorFormat);
+		// 将NV21转换为编码器支持的颜色格式I420，添加时间水印
+		if(isAddTimeOsd){
+			YuvUtils.AddYuvOsd(rotateNv21, mWidth, mHeight, mFrameData,
+					new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()),
+					mColorFormat,isPhoneHorizontal);
+		}else{
+			YuvUtils.transferColorFormat(rotateNv21, mWidth, mHeight, mFrameData, mColorFormat);
+		}
         //返回编码器的一个输入缓存区句柄，-1表示当前没有可用的输入缓存区
         int inputBufferIndex = mVideoEncodec.dequeueInputBuffer(TIMES_OUT);
         if(inputBufferIndex >= 0){
@@ -281,8 +300,16 @@ public class EncoderVideoRunnable implements Runnable {
 		}
 		return null;
     }
+    
+    public boolean isFrontCamera() {
+		return isFrontCamera;
+	}
 
-    /**
+	public void setFrontCamera(boolean isFrontCamera) {
+		this.isFrontCamera = isFrontCamera;
+	}
+
+	/**
      * 根据mime类型匹配编码器支持的颜色格式
      * */
     private int selectSupportColorFormat(MediaCodecInfo mCodecInfo,String mimeType){

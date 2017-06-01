@@ -40,6 +40,7 @@ public class MediaMuxerUtils{
     private Thread mMuxerThread;
     private Thread mVideoThread;
     private Thread mAudioThread;
+    private boolean isFrontCamera;
     private static MediaMuxerUtils muxerUtils;
 
     private MediaMuxerUtils(){}
@@ -64,6 +65,7 @@ public class MediaMuxerUtils{
         audioRunnable = new EncoderAudioRunnable(new WeakReference<MediaMuxerUtils>(this));
         mVideoThread = new Thread(videoRunnable);
         mAudioThread = new Thread(audioRunnable);
+        videoRunnable.setFrontCamera(isFrontCamera);
         mAudioThread.start();
         mVideoThread.start();
          isExit = false;
@@ -197,8 +199,9 @@ public class MediaMuxerUtils{
         }
     }
 
-    public void startMuxerThread(){
+    public void startMuxerThread(boolean isFrontCamera){
         Log.d(TAG,"---启动混合器线程---");
+        this.isFrontCamera = isFrontCamera;
     	if(mMuxerThread == null){
     		synchronized (MediaMuxerUtils.this) {
     	        mMuxerThread =  new Thread(new MediaMuxerRunnable());
