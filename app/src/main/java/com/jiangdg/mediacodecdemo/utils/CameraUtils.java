@@ -24,7 +24,7 @@ public class CameraUtils {
 	private static final String TAG = "CameraManager";
 	public static int PREVIEW_WIDTH = 1280;
 	public static int PREVIEW_HEIGHT = 720;
-
+	public static boolean isUsingYv12 = false;
 	private Camera mCamera;
 	private static Context mContext;
 	private boolean isFrontCamera = false;
@@ -168,8 +168,11 @@ public class CameraUtils {
 		if(mCamera == null)
 			return;
 		Camera.Parameters params = mCamera.getParameters();
-		Log.i(TAG, "使用颜色格式：ImageFormat.NV21");
-		params.setPreviewFormat(ImageFormat.NV21);
+		if(isUsingYv12){
+			params.setPreviewFormat(ImageFormat.YV12);
+		}else{
+			params.setPreviewFormat(ImageFormat.NV21);
+		}
 		//开启自动对焦
 		List<String> focusModes = params.getSupportedFocusModes();
 		if(isSupportFocusAuto(focusModes)){

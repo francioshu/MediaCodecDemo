@@ -13,6 +13,7 @@ import android.widget.Toast;
 import com.jiangdg.mediacodecdemo.utils.CameraUtils;
 import com.jiangdg.mediacodecdemo.utils.MediaMuxerUtils;
 import com.jiangdg.mediacodecdemo.utils.SensorAccelerometer;
+import com.jiangdg.yuvosd.YuvUtils;
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback{
     private Button mBtnRecord;
@@ -23,11 +24,18 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback{
 	//加速传感器
 	private static SensorAccelerometer mSensorAccelerometer;
 
+    byte[] nv21 = new byte[CameraUtils.PREVIEW_WIDTH * CameraUtils.PREVIEW_HEIGHT * 3/2];
+
     private CameraUtils.OnPreviewFrameResult mPreviewListener = new CameraUtils.OnPreviewFrameResult() {
         @Override
         public void onPreviewResult(byte[] data, Camera camera) {
             mCamManager.getCameraIntance().addCallbackBuffer(data);
-            MediaMuxerUtils.getMuxerRunnableInstance().addVideoFrameData(data);
+            if(CameraUtils.isUsingYv12 ){
+                YuvUtils.swapYV12ToNV21(data, nv21, CameraUtils.PREVIEW_WIDTH, CameraUtils.PREVIEW_HEIGHT);
+                MediaMuxerUtils.getMuxerRunnableInstance().addVideoFrameData(nv21);
+            }else{
+                MediaMuxerUtils.getMuxerRunnableInstance().addVideoFrameData(data);
+            }
         }
     };
 
